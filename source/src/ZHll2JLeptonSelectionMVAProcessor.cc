@@ -231,7 +231,7 @@ void ZHll2JLeptonSelectionMVAProcessor::processEvent( LCEvent * evt ) {
 	       << "pxlep1:pylep1:pzlep1:pxlep2:pylep2:pzlep2" << ":"
 	       << "pxj1:pyj1:pzj1:ej1:pxj2:pyj2:pzj2:ej2:cosj1:phij1:cosj2:phij2" << ":"
 	       << "pxnewj1:pynewj1:pznewj1:enewj1:pxnewj2:pynewj2:pznewj2:enewj2" << ":"
-	       << "mhnew"
+	       << "mhnew:cosisr1:cosisr2"
 	       << ends;
     hGen = new TNtupleD("hGen","",tupstr_gen.str().data());
   }
@@ -408,6 +408,8 @@ void ZHll2JLeptonSelectionMVAProcessor::processEvent( LCEvent * evt ) {
   data_gen[43]= lortzJ2NewMC.Pz();  
   data_gen[44]= lortzJ2NewMC.E();
   data_gen[45]= lortzHNewMC.M();    
+  data_gen[46]= lortzISR1MC.CosTheta();
+  data_gen[47]= lortzISR2MC.CosTheta();
   hGen->Fill(data_gen);
 
   // -- Read out PFO information --
