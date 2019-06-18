@@ -34,6 +34,7 @@
 #include "TLorentzVector.h"
 
 #include "Utilities.h"
+#include "JetAlgorithm.h"
 
 //#define __ISR_subtract
 
@@ -42,6 +43,7 @@ using namespace marlin ;
 using namespace std;
 
 using namespace mylib;
+using namespace myjet;
 
 
 ZHll2JAnalysisProcessor aZHll2JAnalysisProcessor ;
@@ -176,7 +178,8 @@ void ZHll2JAnalysisProcessor::processEvent( LCEvent * evt ) {
 	   << "mhnew"  << ":"
 	   << "cosisr1mc:cosisr2mc:mh" << ":"
 	   << "bmax1:bmax2:yminus:yplus:yminus4:yplus4:npfosc1:npfosc2" << ":"
-	   << "mrecoilmc"
+	   << "mrecoilmc:cosj1h:phij1h:cosj2h:phij2h:mhcol:ej1h:ej2h" << ":"
+	   << "mhjet:mhmuon:mhjet2:mj1h:mj2h:mj1:mj2"
 	   << ends;
     hAnl = new TNtupleD("hAnl","",tupstr.str().data());
   }
@@ -187,9 +190,11 @@ void ZHll2JAnalysisProcessor::processEvent( LCEvent * evt ) {
   LCCollection *colMC = evt->getCollection(_colMCP);
   // get the truth information
   Int_t nMCP = colMC->getNumberOfElements();
-  TLorentzVector lortzLep1MC,lortzLep2MC,lortzZMC,lortzHMC,lortzISRMC;
+  TLorentzVector lortzLep1MC,lortzLep2MC,lortzZMC,lortzHMC,lortzISRMC,lortzHColMC;
   TLorentzVector lortzISR1MC, lortzISR2MC;
   TLorentzVector lortzJ1MC, lortzJ2MC;  
+  LCCollectionVec *colMCH = new LCCollectionVec(LCIO::MCPARTICLE);
+  std::vector<JJet> vjetsMCH;
   for (Int_t i=0;i<nMCP;i++) {
     MCParticle *mcPart = dynamic_cast<MCParticle*>(colMC->getElementAt(i));
     Int_t pdg = mcPart->getPDG();
@@ -231,6 +236,17 @@ void ZHll2JAnalysisProcessor::processEvent( LCEvent * evt ) {
     }
     if (i == 1) {
       lortzISR2MC = lortz;
+    }
+    if (mcPart->getGeneratorStatus() == 1 && ioverlay == 0) {
+      //      cerr << i << ": Origin = " << getOriginalPDG(mcPart,true) << endl;
+#if 1
+      if (getOriginalPDG(mcPart,true) == 25) {
+	colMCH->addElement(mcPart);
+	lortzHColMC += lortz;
+	JJet jh(lortz);
+	vjetsMCH.push_back(jh);
+      }
+#endif      
     }
   }
   // get Higgs decay modes
@@ -516,6 +532,43 @@ void ZHll2JAnalysisProcessor::processEvent( LCEvent * evt ) {
   TLorentzVector lortzJ1New = TLorentzVector(momentumJ1New,eJ1New);
   TLorentzVector lortzJ2New = TLorentzVector(momentumJ2New,eJ2New);  
   TLorentzVector lortzHNew = lortzJ1New + lortzJ2New;
+
+  // for cheating study
+  // get two jets from MC Particles from Higgs decay
+  //  JJets jetsMCH(colMCH);
+  JJets jetsMCH(vjetsMCH,1);  
+  //  jetsMCH.SetAlgorithm(1); // 1=Durham fixedN
+  jetsMCH.DoClustering(2);
+    //    double yMinus = jets.GetYMinus(); // current smallest Yij
+    //    double yPlus  = jets.GetYPlus();  // last smallest Yij
+  LCCollection *colJetMCH = jetsMCH.GetJetsCol(); // get output jets collection
+  ReconstructedParticle *jetsh[2];
+  for (Int_t i=0;i<2;i++) {
+    jetsh[i] = dynamic_cast<ReconstructedParticle*>(colJetMCH->getElementAt(i));
+  }
+  // jets information
+  ReconstructedParticle *jet1h = jetsh[0];
+  ReconstructedParticle *jet2h = jetsh[1];
+  TVector3 momentum_j1h = TVector3(jet1h->getMomentum());
+  TVector3 momentum_j2h = TVector3(jet2h->getMomentum());
+  Double_t e_j1h  = jet1h->getEnergy();
+  Double_t e_j2h  = jet2h->getEnergy();
+  TLorentzVector lortzJ1h = TLorentzVector(momentum_j1h,e_j1h);
+  TLorentzVector lortzJ2h = TLorentzVector(momentum_j2h,e_j2h);
+  TLorentzVector lortzHh = lortzJ1h + lortzJ2h;
+  // match
+  Double_t cosj1h_1 = getCosTheta(lortzJ1h,lortzJ1MC);
+  Double_t cosj1h_2 = getCosTheta(lortzJ1h,lortzJ2MC);
+  if (cosj1h_1 < cosj1h_2) {
+    TLorentzVector lortz_tmp = lortzJ1h;
+    lortzJ1h = lortzJ2h;
+    lortzJ2h = lortz_tmp;
+  }
+
+  // cheat jets direction
+  Double_t mH_jet  = getHMass(lortzJ1h,lortzJ2h,lortzRecoil);
+  Double_t mH_muon = getHMass(lortzJ1,lortzJ2,lortzRecoilMC);
+  Double_t mH_jet2 = getHMass(lortzJ1h,lortzJ2h,lortzRecoil,lortzJ1,lortzJ2);
   
 
   Double_t data[200];
@@ -643,6 +696,20 @@ void ZHll2JAnalysisProcessor::processEvent( LCEvent * evt ) {
   data[121]= nPFOsCJ1;
   data[122]= nPFOsCJ2;
   data[123]= lortzRecoilMC.M();
+  data[124]= lortzJ1h.CosTheta();  
+  data[125]= lortzJ1h.Phi();  
+  data[126]= lortzJ2h.CosTheta();  
+  data[127]= lortzJ2h.Phi();  
+  data[128]= lortzHColMC.M();  
+  data[129]= lortzJ1h.E();  
+  data[130]= lortzJ2h.E();  
+  data[131]= mH_jet;
+  data[132]= mH_muon;
+  data[133]= mH_jet2;
+  data[134]= lortzJ1h.M();  
+  data[135]= lortzJ2h.M();  
+  data[136]= lortzJ1.M();  
+  data[137]= lortzJ2.M();  
   hAnl->Fill(data);
 
   //-- note: this will not be printed if compiled w/o MARLINDEBUG=1 !
@@ -685,4 +752,60 @@ void ZHll2JAnalysisProcessor::end(){
   }
   cerr << "  -----------------------------------------------------------" << endl;
   
+}
+
+Double_t ZHll2JAnalysisProcessor::getHMass(TLorentzVector lortzJ1, TLorentzVector lortzJ2, TLorentzVector lortzRecoil) {
+  Double_t thetaJ1 = lortzJ1.Theta();
+  Double_t thetaJ2 = lortzJ2.Theta();
+  Double_t phiJ1 = lortzJ1.Phi();  
+  Double_t phiJ2 = lortzJ2.Phi();  
+  TVector2 pJ12New = getMomentumNew(lortzRecoil.Px(),lortzRecoil.Py(),
+				 thetaJ1,thetaJ2,phiJ1,phiJ2);
+  Double_t pJ1New = pJ12New.X();
+  TVector3 momentumJ1New = TVector3(pJ1New*TMath::Sin(thetaJ1)*TMath::Cos(phiJ1),
+				      pJ1New*TMath::Sin(thetaJ1)*TMath::Sin(phiJ1),
+				      pJ1New*TMath::Cos(thetaJ1));
+  Double_t pJ2New = pJ12New.Y();
+  TVector3 momentumJ2New = TVector3(pJ2New*TMath::Sin(thetaJ2)*TMath::Cos(phiJ2),
+				      pJ2New*TMath::Sin(thetaJ2)*TMath::Sin(phiJ2),
+				      pJ2New*TMath::Cos(thetaJ2));
+  Double_t mJ1 = lortzJ1.M();
+  Double_t mJ2 = lortzJ2.M();
+  Double_t eJ1New = TMath::Sqrt(momentumJ1New.Mag()*momentumJ1New.Mag()+
+				  mJ1*mJ1);
+  Double_t eJ2New = TMath::Sqrt(momentumJ2New.Mag()*momentumJ2New.Mag()+
+				  mJ2*mJ2);
+  TLorentzVector lortzJ1New = TLorentzVector(momentumJ1New,eJ1New);
+  TLorentzVector lortzJ2New = TLorentzVector(momentumJ2New,eJ2New);  
+  TLorentzVector lortzHNew = lortzJ1New + lortzJ2New;
+
+  return lortzHNew.M();
+}
+
+Double_t ZHll2JAnalysisProcessor::getHMass(TLorentzVector lortzJ1, TLorentzVector lortzJ2, TLorentzVector lortzRecoil,TLorentzVector lortzJ1m, TLorentzVector lortzJ2m) {
+  Double_t thetaJ1 = lortzJ1.Theta();
+  Double_t thetaJ2 = lortzJ2.Theta();
+  Double_t phiJ1 = lortzJ1.Phi();  
+  Double_t phiJ2 = lortzJ2.Phi();  
+  TVector2 pJ12New = getMomentumNew(lortzRecoil.Px(),lortzRecoil.Py(),
+				 thetaJ1,thetaJ2,phiJ1,phiJ2);
+  Double_t pJ1New = pJ12New.X();
+  TVector3 momentumJ1New = TVector3(pJ1New*TMath::Sin(thetaJ1)*TMath::Cos(phiJ1),
+				      pJ1New*TMath::Sin(thetaJ1)*TMath::Sin(phiJ1),
+				      pJ1New*TMath::Cos(thetaJ1));
+  Double_t pJ2New = pJ12New.Y();
+  TVector3 momentumJ2New = TVector3(pJ2New*TMath::Sin(thetaJ2)*TMath::Cos(phiJ2),
+				      pJ2New*TMath::Sin(thetaJ2)*TMath::Sin(phiJ2),
+				      pJ2New*TMath::Cos(thetaJ2));
+  Double_t mJ1 = lortzJ1m.M();
+  Double_t mJ2 = lortzJ2m.M();
+  Double_t eJ1New = TMath::Sqrt(momentumJ1New.Mag()*momentumJ1New.Mag()+
+				  mJ1*mJ1);
+  Double_t eJ2New = TMath::Sqrt(momentumJ2New.Mag()*momentumJ2New.Mag()+
+				  mJ2*mJ2);
+  TLorentzVector lortzJ1New = TLorentzVector(momentumJ1New,eJ1New);
+  TLorentzVector lortzJ2New = TLorentzVector(momentumJ2New,eJ2New);  
+  TLorentzVector lortzHNew = lortzJ1New + lortzJ2New;
+
+  return lortzHNew.M();
 }
