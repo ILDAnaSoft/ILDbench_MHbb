@@ -10,6 +10,7 @@
 #include "TString.h"
 //#include <iostream>
 #include <sstream>
+#include "TLorentzVector.h"
 
 
 /**  Example processor for marlin.
@@ -59,7 +60,8 @@ class ZHll2JAnalysisProcessor : public marlin::Processor {
    */
   virtual void end() ;
   
-
+  Double_t getHMass(TLorentzVector lortzJ1, TLorentzVector lortzJ2, TLorentzVector lortzRecoil);
+  Double_t getHMass(TLorentzVector lortzJ1, TLorentzVector lortzJ2, TLorentzVector lortzRecoil,TLorentzVector lortzJ1m, TLorentzVector lortzJ2m);
  protected:
 
   /** Input collection name.
