@@ -179,7 +179,7 @@ void ZHll2JAnalysisProcessor::processEvent( LCEvent * evt ) {
 	   << "cosisr1mc:cosisr2mc:mh" << ":"
 	   << "bmax1:bmax2:yminus:yplus:yminus4:yplus4:npfosc1:npfosc2" << ":"
 	   << "mrecoilmc:cosj1h:phij1h:cosj2h:phij2h:mhcol:ej1h:ej2h" << ":"
-	   << "mhjet:mhmuon:mhjet2:mj1h:mj2h:mj1:mj2"
+	   << "mhjet:mhmuon:mhjet2:mj1h:mj2h:mj1:mj2:mhjet3:mhjet4:mhjet5" 
 	   << ends;
     hAnl = new TNtupleD("hAnl","",tupstr.str().data());
   }
@@ -566,9 +566,12 @@ void ZHll2JAnalysisProcessor::processEvent( LCEvent * evt ) {
   }
 
   // cheat jets direction
-  Double_t mH_jet  = getHMass(lortzJ1h,lortzJ2h,lortzRecoil);
-  Double_t mH_muon = getHMass(lortzJ1,lortzJ2,lortzRecoilMC);
-  Double_t mH_jet2 = getHMass(lortzJ1h,lortzJ2h,lortzRecoil,lortzJ1,lortzJ2);
+  Double_t mH_jet  = getHMass(lortzJ1h,lortzJ2h,lortzRecoil);   // cheat jet mass & jet direction
+  Double_t mH_muon = getHMass(lortzJ1,lortzJ2,lortzRecoilMC);   // cheat muon 4-momentum
+  Double_t mH_jet2 = getHMass(lortzJ1h,lortzJ2h,lortzRecoil,lortzJ1,lortzJ2); // cheat jet direction
+  Double_t mH_jet3 = getHMass(lortzJ1,lortzJ2,lortzRecoil,lortzJ1h,lortzJ2h); // cheat jet mass
+  Double_t mH_jet4 = getHMass(lortzJ1h,lortzJ2h,lortzRecoilMC,lortzJ1,lortzJ2); // cheat jet direction & muon 4-momentum
+  Double_t mH_jet5 = getHMass(lortzJ1,lortzJ2,lortzRecoilMC,lortzJ1h,lortzJ2h); // cheat jet mass & muon 4-momentum
   
 
   Double_t data[200];
@@ -710,6 +713,9 @@ void ZHll2JAnalysisProcessor::processEvent( LCEvent * evt ) {
   data[135]= lortzJ2h.M();  
   data[136]= lortzJ1.M();  
   data[137]= lortzJ2.M();  
+  data[138]= mH_jet3;
+  data[139]= mH_jet4;
+  data[140]= mH_jet5;
   hAnl->Fill(data);
 
   //-- note: this will not be printed if compiled w/o MARLINDEBUG=1 !
