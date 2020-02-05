@@ -1,0 +1,77 @@
+#!/bin/bash
+
+
+#model=ILD_l5_o1_v02
+model=ILD_s5_o1_v02
+#model=ILD_o1_v05
+
+
+indir=rootfile
+#outdir=root_merge
+#outdir=root_merge_noovl_lep
+#outdir=ISRTag
+outdir=root_merge.m${model}
+
+listdir=list
+mkdir -p ${outdir} ${listdir}
+
+
+
+merge() {
+    #    prolist=1000_6f.list
+    prolist=$1
+    prefix=$2
+    npro=`more ${prolist} | wc -l`
+    for (( i=1 ; i<=${npro}; i++  )) ; do
+	line=`head -$i ${prolist} | tail -1`
+#	if [[ "$line" =~ "#.*" ]] ; then	
+	if [[ $line =~ ^# ]] ; then	
+	    echo "Line $i: this is a comment line"
+	    echo $line
+	    continue
+	fi
+	paras=(`head -$i ${prolist} | tail -1`)
+	ecm=${paras[0]}
+	id=${paras[1]}
+	name=${paras[2]}
+	type=${paras[3]}
+	pol=${paras[4]}
+	xsec=${paras[5]}
+	xseclr=${paras[6]}
+	xsecrl=${paras[7]}
+	#	echo $ecm $id $name $type $pol $xsec $xseclr $xsecrl
+	#	echo $name $pol $xsec
+
+	#	flist=${listdir}/${name}.${pol}.list
+	flist=${listdir}/${name}.${pol}.m${model}.list	
+
+	if [ "x${prefix}" == "xmydirac" ] ; then
+	    xname="Dirac*"${name}"."
+	elif [ "x${prefix}" == "xDBD" ] ; then
+	    xname="rv*.m"${model}".*"${name}"."
+	fi
+
+	ls -1 ${indir}/${xname}*${pol}*.root > ${flist}
+
+	nf=`more ${flist} | wc -l`
+	addlist=`head -${nf} ${flist}`
+
+
+	echo $id $name $pol ": merging" $nf "files"
+	
+	hadd -f ${outdir}/${name}.${pol}.m${model}.root ${addlist}	
+    done
+}
+
+#merge 500_6f.list DBD
+#merge 500_4f.list DBD
+#merge 500_2f.list DBD
+#merge 500_sig.list mydirac
+#merge 500_bkg.list mydirac
+
+#merge 500_test.list mydirac
+#merge 500_test.list DBD
+
+merge 500_4f.list DBD
+merge 500_2f.list DBD
+merge 500_sig.list DBD
