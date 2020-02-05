@@ -1,0 +1,202 @@
+#!/bin/bash
+
+model=ILD_l5_o1_v02
+#model=ILD_s5_o1_v02
+
+#rm -rf  sublog log data_output rootfile tmpxml myxml data_list
+
+mkdir -p sublog log data_output rootfile tmpxml myxml data_list
+
+inputxml=zhll2j.xml
+#inputxml=zhll2j_ovl.xml
+
+
+jobque=s
+#jobque=l
+
+ecm=500
+
+
+##for test
+goTest() {
+    #    submit     ax         data_dirac_${ecm}        Dirac-Dst       1    test
+    #    submit     ax_inv     data_dirac_${ecm}        Dirac-Dst       1    test    
+    #    submit     2f_z_h     data_dbd_${ecm}          rv              1    test
+    #    submit     e2e2h     data_dbd_${ecm}          rv              1    test    
+    #    submit     e2e2h_bb     data_dirac_${ecm}        Dirac-Dst       1    test
+#    submit     e2e2h     data_ildopt_${ecm}          rv              1    test
+    #    submit     e1e1h     data_ildopt_${ecm}          rv              1    test
+#    submit     4f_zz_sl     data_ildopt_${ecm}          rv              1    test    
+
+    #    submit     e1e1h     data_ildopt_${ecm}          rv              1
+    #    submit     4f_ww_sl     data_ildopt_${ecm}          rv              1    test
+
+#    submit     4f_ww_sl     data_ildopt_${ecm}          rv              5
+#    submit     yyxylv     data_ildopt_${ecm}          rv              5
+    submit     e2e2h     data_ildopt_${ecm}          rv              5
+#    submit     e1e1h     data_ildopt_${ecm}          rv              5
+#    submit     yyxyev     data_ildopt_${ecm}          rv              5
+#    submit     4f_sw_sl     data_ildopt_${ecm}          rv              5                
+
+    #    submit     e2e2h     data_ildopt_${ecm}          rv              1    limit    5    
+}
+
+###-------------------------------------
+###signal
+###-------------------------------------
+goSig() {
+    #    data_dir_in=data_dirac_${ecm}
+    #    data_prefix=Dirac-Dst
+    data_dir_in=data_ildopt_${ecm}
+    data_prefix=rv
+    #    n_per_job=0
+    #n_per_job=200
+    #    n_per_job=10
+    n_per_job=1
+    #    psg="ax"
+#    psg="ax_inv"
+    #    psg="2f_z_nu0nu 2f_z_nu0nue"
+    #    psg="ax_inv 2f_z_nu0nu 2f_z_nu0nue"
+    #    psg="ax_inv ax_inv_nw 2f_z_nu0nu 2f_z_nu0nue"
+#    psg="ax_inv_nw"    
+
+    #    psg="e2e2h"
+    #    psg="e2e2h_bb"
+    #    psg="e1e1h_bb"
+    #    psg="4f_zz_sl"
+    #    psg="e2e2h_gg"
+    psg="e2e2h e1e1h"    
+    
+    for p in ${psg} ; do
+        echo "Process: " $p
+        submit ${p} ${data_dir_in} ${data_prefix} ${n_per_job}
+    done
+}
+
+###-------------------------------------
+###SM background
+###-------------------------------------
+goBkg() {
+    p2f="2f_z_l 2f_z_bhabhag 2f_z_h"
+    p4f="4f_zz_l 4f_zz_sl 4f_zz_h 4f_ww_l 4f_ww_sl 4f_ww_h 4f_zzorww_l 4f_zzorww_h 4f_sw_l 4f_sw_sl 4f_sze_l 4f_sze_sl 4f_sznu_l 4f_sznu_sl 4f_szeorsw_l"
+    p6f="6f*"
+    #    psm="$p2f $p4f $p6f"
+    #    psm="$p2f $p4f $p6f e2e2h"
+    psm="$p2f $p4f"        
+    #    psm="4f_zz_sl"
+    #    psm="e2e2h 4f_zz_sl"    
+
+    #echo $pall
+
+    data_dir_in=data_ildopt_${ecm}
+    data_prefix=rv
+    #    n_per_job=10
+    n_per_job=1
+
+    #for p in ${p6f} ; do
+    #for p in ${p4f} ; do
+    #for p in ${p2f} ; do
+    for p in ${psm} ; do
+        echo "Process: " $p
+        submit ${p} ${data_dir_in} ${data_prefix} ${n_per_job}
+    done
+}
+	
+
+
+submit() {
+
+    process=$1
+    dirin=$2
+    prefix=$3
+    nperjob=$4
+    mode=$5
+
+#    flist=data_list/${process}.list
+    flist=data_list/${process}.${model}.list
+#    echo "search data in ${dirin}"
+#    `find ${dirin}/ -name ${prefix}*${process}.*.slcio | sort -n > ${flist}`
+    `find ${dirin}/ -name ${prefix}*.m${model}.*${process}.*.slcio | sort -n > ${flist}`
+
+    ntot=`more ${flist} | wc -l`
+    echo "total number of files in ${process}: " ${ntot}
+    echo "number of files per job: " ${nperjob}    
+
+    if [ ${ntot} -le 0 ] ; then
+	echo "WARNING: there's no data found in process ${process}! Please have a check."
+    fi
+    
+    if [ ${nperjob} -le 0 ] ; then
+	nperjob=${ntot}
+	echo "number of files per job is reset to ${ntot}"
+    fi
+
+    njobs=$[(${ntot}-1)/${nperjob}+1]
+    echo "total number of jobs for ${process}: " ${njobs}    
+
+    for (( i=1; i<=${njobs}; i++ )) ; do
+	ifirst=$[${nperjob}*($i-1)+1]
+	ilasttmp=$[${ifirst}+${nperjob}-1]
+	if [ ${ilasttmp} -le ${ntot} ] ; then
+	    ilast=${ilasttmp}
+	else
+	    ilast=${ntot}
+	fi
+	if [ $[${ilast}] -ge $[${nlimit}] ] ; then
+	    if [ "x${mode}" == "xlimit" ] ; then
+		echo "Limit Mode Activated..."
+		ilast=${nlimit}
+	    fi
+	fi
+	log=./sublog/${process}"_"`printf %03d $i`.log
+	echo "submitting job `printf %03d ${i}`: from ${ifirst} to ${ilast}"
+	bsub -q ${jobque} -J "ana_${process}_"`printf %03d $i` -o $log \
+	     "./goMarlin ${flist} ${ifirst} ${ilast} ${inputxml}"
+#	./goMarlin ${flist} ${ifirst} ${ilast} ${inputxml}
+	if [ "x${mode}" == "xtest" ] ; then
+	    echo "Test Mode Activated..."
+	    break
+	fi
+	if [ $[${ilast}] -ge $[${nlimit}] ] ; then
+	    if [ "x${mode}" == "xlimit" ] ; then
+		echo "Limit Mode finished"
+		break
+	    fi
+	fi
+    done
+}
+
+#         #process              #data dir          #prefix    #nf per job
+#submit     2f_z_l         data_dbd_${ecm}        rv           1
+
+
+
+########
+#goTest
+#goSig
+#goBkg
+
+task=$1
+
+if [ "x${task}" == "xtest" ] ; then
+    echo "Going to do some test jobs..."
+    goTest
+elif [ "x${task}" == "xsig" ] ; then
+    echo "Going to do all jobs for signal..."
+    goSig
+elif [ "x${task}" == "xbkg" ] ; then
+    echo "Going to do all jobs for background..."
+    goBkg
+elif [ "x${task}" == "xall" ] ; then
+    echo "Going to do all jobs for both signal and background..."
+    goSig
+    goBkg
+elif [ "x${task}" == "xclear" ] ; then
+    echo "Going to clear up something..."
+    rm -rf data_list data_output log myxml tmpxml sublog rootfile    
+else
+    echo "Please let me know what to do..."
+    echo "Supported options: ./goSteve test; ./goSteve sig; ./goSteve bkg; ./goSteve all; ./goSteve clear"
+    echo "Good Luck!"
+fi
+    

@@ -1,0 +1,47 @@
+#!/bin/bash
+##!/bin/bash -x
+#. marlin_env_v01-16-02.sh
+#. marlin_env_v01-17-06.sh
+. marlin_env_v02-00-01.sh
+export MARLIN_DLL="../lib/libzhll2j.so:$MARLIN_DLL"
+
+list=$1
+start=$2
+end=$3
+inputxml=$4
+
+outputDir=./data_output
+rootfileDir=./rootfile
+logDir=./log
+
+tmpxmlDir=./tmpxml
+xmlDir=./myxml
+
+for (( i=${start}; i<=${end}; i++ )) ; do
+  input=`head -$i ${list} | tail -1`
+  file=`basename ${input}`
+  name=${file%.*}
+  tmpxml=$tmpxmlDir/${name}.xml
+  rootxml=$tmpxmlDir/${name}.root.xml
+  lastxml=$xmlDir/${name}.xml
+  
+  log=$logDir/${name}.log    
+  output=$outputDir/${name}.slcio
+  rootfile=$rootfileDir/${name}.root
+
+#  if [ -f ${rootfile} ] ; then
+#      echo "root file already exists; skip this job..."
+#      continue
+#  fi
+  
+  sed -e "/<!-- INPUT.slcio -->/i $input" $inputxml | sed -e "/<!-- OUTPUT.root -->/i $rootfile" \
+      | sed -e "/<!-- OUTPUT.slcio -->/i $output"  > $lastxml
+
+  ${MARLIN}/bin/Marlin $lastxml > $log 2>&1
+  
+  echo "finished: marlin for file number $i"
+  
+done
+
+
+
